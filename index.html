@@ -1,0 +1,1380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Balance the Scale</title>
+<meta name="description" content="A calm, free number puzzle in a retro DOS look. Balance the scale with the fewest weights. No ads, no accounts, no timers.">
+<meta name="theme-color" content="#0000aa">
+<meta property="og:title" content="Balance the Scale">
+<meta property="og:description" content="A calm, free number puzzle in a retro DOS look. No ads, no accounts, no timers.">
+<meta property="og:image" content="https://iravindu.github.io/balance-the-scale/docs/screenshot-desktop.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+<style>
+/* Layout: one blue text-mode screen, centered on black. Top to bottom: menu bar,
+   command line, SCALE window, WEIGHTS window (keycap tray), KEYBOARD window
+   (on-screen key legend), MESSAGE window, grey status bar with live par/used/hints. */
+:root {
+  --desk: #000000;
+  --blue: #0000aa;
+  --grey: #aaaaaa;
+  --white: #ffffff;
+  --cyan: #55ffff;
+  --yellow: #ffff55;
+  --magenta: #ff55ff;
+  --green: #55ff55;
+  --red: #ff5555;
+  --ink: #000000;      /* text on grey chrome and on coloured fills */
+  --dim: #555555;      /* keycap edge */
+  --shade: #000000;    /* block outlines and keycap shadows */
+  --hover: #ffffff;    /* outline on a hovered block */
+  --scan: rgba(0,0,0,.14);
+  --flash: #ffffff;
+  --font: 'VT323', 'Courier New', monospace;
+  color-scheme: dark;
+}
+/* Themes change colour only. Layout, font, borders and controls stay the same DOS text-mode screen.
+   The attribute is data-skin, not data-theme: the viewer owns data-theme for light/dark. */
+:root[data-skin="slate"] {
+  --desk: #191d25; --blue: #2b303b; --grey: #a6acb8; --white: #e2e6ee;
+  --cyan: #bfeaf2; --yellow: #ebcb8b; --magenta: #b48ead; --green: #94d88a; --red: #d0707a;
+  --ink: #1b1f27; --dim: #4c566a; --shade: #12151b; --hover: #ffffff;
+  --scan: rgba(0,0,0,.08); --flash: #dfe8ff;
+}
+:root[data-skin="amber"] {
+  --desk: #080503; --blue: #1b1207; --grey: #c99347; --white: #f0d7a5;
+  --cyan: #f3ead0; --yellow: #ffc857; --magenta: #d4693f; --green: #9fd35a; --red: #e0674a;
+  --ink: #1b1207; --dim: #6a4a20; --shade: #0b0703; --hover: #fff2d6;
+  --scan: rgba(0,0,0,.16); --flash: #ffd9a0;
+}
+:root[data-skin="phosphor"] {
+  --desk: #020603; --blue: #0a170c; --grey: #7dbf86; --white: #d9f2d6;
+  --cyan: #b4f7e8; --yellow: #d6f06a; --magenta: #d99ac8; --green: #33ff66; --red: #ff7a6a;
+  --ink: #04100a; --dim: #2f5a35; --shade: #010402; --hover: #f0fff0;
+  --scan: rgba(0,0,0,.18); --flash: #b8ffc0;
+}
+/* LCD is the one light theme: pale sage screen, dark olive chrome, light text on every dark fill. */
+:root[data-skin="lcd"] {
+  --desk: #8d9a76; --blue: #c5cfa9; --grey: #34402c; --white: #1e2717;
+  --cyan: #175a56; --yellow: #80491b; --magenta: #7a3a66; --green: #21692a; --red: #a3322a;
+  --ink: #eef3dc; --dim: #1f281a; --shade: #1a2214; --hover: #f4f8e6;
+  --scan: rgba(30,39,23,.04); --flash: #ffffff;
+  color-scheme: light;
+}
+html { background: var(--desk); }
+body {
+  background: var(--desk);
+  color: var(--grey);
+  font-family: var(--font);
+  font-size: 22px;
+  line-height: 1.15;
+  padding-inline: 16px;
+  padding-block: 16px;
+}
+* { box-sizing: border-box; }
+.screen {
+  position: relative;
+  max-width: 880px;
+  margin: 0 auto;
+  background: var(--blue);
+  display: grid;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+.screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, var(--scan) 0 1px, transparent 1px 3px);
+}
+.screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--flash);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.screen.flash::before { animation: flash .45s ease-out; }
+@keyframes flash { 0% { opacity: .2; } 100% { opacity: 0; } }
+
+.menubar {
+  background: var(--grey);
+  color: var(--ink);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 22px;
+  padding: 2px 12px;
+  align-items: center;
+}
+.menubar .grow { flex: 1 1 auto; }
+.menubar button {
+  font: inherit; color: var(--ink); background: transparent; border: 0;
+  padding: 0 6px; cursor: pointer;
+}
+@media (hover: hover) { .menubar button:hover { background: var(--ink); color: var(--grey); } }
+.prompt { color: var(--white); padding-inline: 12px; min-height: 1.2em; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 12px; }
+.prompt .copy { margin-left: auto; color: var(--grey); font-size: .85em; white-space: nowrap; }
+.cursor { display: inline-block; width: .55em; height: 1em; background: var(--grey); vertical-align: -0.12em; margin-left: 2px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.win {
+  margin: 0 12px;
+  min-width: 0;
+  border: 4px double var(--white);
+  padding: 8px 12px 12px;
+}
+.win > legend {
+  background: var(--grey);
+  color: var(--ink);
+  padding: 0 10px;
+  margin-inline: auto;
+}
+
+#scaleWrap { position: relative; }
+#scaleSvg svg { width: 100%; height: auto; display: block; }
+#scaleWrap text { font-family: var(--font); }
+#fx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.sp {
+  position: absolute; left: 50%; top: 20%;
+  font-size: 28px; line-height: 1;
+  animation: spark 1.2s cubic-bezier(.1,.7,.3,1) forwards;
+}
+@keyframes spark {
+  0% { transform: translate(0, 0) scale(1.2); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(.6); opacity: 0; }
+}
+
+.blk rect, .blk ellipse { stroke: var(--shade); stroke-width: 2; }
+.blk text { fill: var(--ink); font-size: 26px; text-anchor: middle; }
+.blk.fx rect { fill: var(--grey); }
+.blk.pl rect { fill: var(--yellow); }
+.blk.my rect { fill: var(--cyan); }
+.blk.ng ellipse { fill: var(--magenta); }
+.blk[data-id] { cursor: pointer; }
+@media (hover: hover) { .blk[data-id]:hover rect, .blk[data-id]:hover ellipse { stroke: var(--hover); } }
+.blk.drop { transform-box: fill-box; transform-origin: 50% 100%; animation: drop .3s cubic-bezier(.3,1.3,.5,1) both; }
+@keyframes drop {
+  0% { transform: translateY(-52px) scale(.92, 1.12); opacity: .2; }
+  55% { transform: translateY(0) scale(1.14, .78); opacity: 1; }
+  78% { transform: translateY(-5px) scale(.97, 1.05); }
+  100% { transform: none; }
+}
+.blk.ghost { animation: bob .7s ease-in-out infinite alternate; }
+.blk.ghost rect, .blk.ghost ellipse, .blk.ghost.ng ellipse { fill: none; stroke: var(--cyan); stroke-dasharray: 5 3; }
+.blk.ghost text { fill: var(--cyan); }
+@keyframes bob { from { transform: translateY(-4px); } to { transform: translateY(-13px); } }
+.blk.pulse { transform-box: fill-box; transform-origin: 50% 50%; animation: pulse .6s ease-out both; }
+@keyframes pulse { 0% { transform: scale(1); } 35% { transform: scale(1.4); } 100% { transform: scale(1); } }
+.beam { stroke: var(--white); stroke-width: 9; stroke-linecap: square; }
+.beam.ok { stroke: var(--green); }
+.string { stroke: var(--grey); stroke-width: 2; }
+.pan { fill: var(--grey); }
+.post { fill: var(--grey); }
+.pivot { fill: var(--yellow); stroke: var(--shade); stroke-width: 2; }
+.pivot.ok { fill: var(--green); }
+.sidelabel { fill: var(--cyan); font-size: 22px; text-anchor: middle; }
+
+.tray { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; padding-block: 6px 4px; }
+.pc {
+  position: relative;
+  font: inherit;
+  width: 84px; height: 82px;
+  background: var(--grey); color: var(--ink);
+  border: 0; cursor: pointer;
+  box-shadow: 4px 4px 0 var(--shade);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 10px 0 0;
+  transition: transform .06s;
+}
+.pc b { font-weight: normal; font-size: 38px; line-height: 1; }
+.pc.cur { outline: 3px solid var(--white); outline-offset: 3px; }
+.pc.lift { transform: translateY(-16px); box-shadow: 4px 20px 0 var(--shade); }
+.pc.lift:not(.neg) { background: var(--yellow); }
+.pc.lift em { font-weight: normal; }
+.pc em { font-style: normal; font-size: 16px; line-height: 1; margin-top: 2px; }
+.pc.neg { background: var(--magenta); }
+.pc.onL, .pc.onR {
+  background: transparent; color: var(--cyan); box-shadow: none;
+  border: 2px dashed var(--cyan);
+}
+.pc.onL i, .pc.onR i { background: var(--cyan); color: var(--ink); }
+.pc.neg.onL, .pc.neg.onR { color: var(--magenta); border-color: var(--magenta); }
+.pc.neg.onL i, .pc.neg.onR i { background: var(--magenta); }
+.pc.hit { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--shade); }
+.pc.onL.hit, .pc.onR.hit { transform: none; }
+.pc.hint { animation: blink .6s steps(1) infinite; }
+.pc:disabled { cursor: default; opacity: .75; }
+.pc.enter { animation: pop .28s cubic-bezier(.3,1.5,.5,1) both; animation-delay: calc(var(--i) * 45ms); }
+@keyframes pop { 0% { transform: scale(.5); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.legend { color: var(--cyan); text-align: center; font-size: 19px; margin-top: 8px; }
+.legend span { white-space: nowrap; }
+.lgs { display: none; }
+body.compact .lgw, body.tland .lgw { display: none; }
+body.compact .lgs, body.tland .lgs { display: block; }
+.lgs > span { margin: 0 6px; }
+.sw { display: inline-block; width: .75em; height: .75em; margin-right: 4px; vertical-align: -1px; border: 1px solid var(--shade); }
+.sw.fx { background: var(--grey); } .sw.pl { background: var(--yellow); }
+.sw.ng { background: var(--magenta); border-radius: 50%; } .sw.my { background: var(--cyan); }
+
+.how { margin: 0 0 10px; text-align: center; color: var(--white); }
+.how b { font-weight: normal; color: var(--yellow); }
+.keys { display: flex; flex-wrap: wrap; gap: 12px 22px; justify-content: center; }
+.kc {
+  font: inherit; color: var(--grey); background: transparent; border: 0; padding: 0;
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+}
+.kc.static { cursor: default; }
+kbd {
+  font: inherit; background: var(--grey); color: var(--ink);
+  padding: 0 9px; border-bottom: 4px solid var(--dim); border-right: 2px solid var(--dim);
+  display: inline-block; transition: transform .05s;
+}
+.kc.hit kbd, kbd.hit { transform: translateY(3px); border-bottom-width: 1px; background: var(--yellow); }
+.kc.dim { opacity: .4; }
+@media (hover: hover) { .kc:hover:not(:disabled):not(.static) span { color: var(--white); } }
+.kc:disabled { cursor: default; opacity: .55; }
+.kc.go:not(:disabled) kbd { background: var(--green); }
+.kc.go:not(:disabled) span { color: var(--green); }
+:focus-visible { outline: 3px dashed var(--yellow); outline-offset: 2px; }
+
+#msg { min-height: 4.7em; color: var(--white); }
+#msg .ttl { color: var(--green); }
+#msg .warn { color: var(--yellow); }
+.status {
+  background: var(--grey); color: var(--ink);
+  display: flex; flex-wrap: wrap; gap: 0 26px; justify-content: center;
+  padding: 2px 12px;
+}
+/* 16:9 stage: a fixed 1280x720 screen scaled to fit the window.
+   Left column: scale over weights. Right column: keyboard over message. */
+html { height: 100%; }
+.colL, .colR { display: grid; gap: 12px; min-width: 0; }
+body.stage { height: 100%; padding: 0; overflow: hidden; display: grid; place-items: center; }
+body.stage #fit { position: relative; overflow: hidden; }
+body.stage .screen {
+  position: absolute; top: 0; left: 0;
+  width: 1280px; height: 720px; max-width: none; margin: 0;
+  transform-origin: 0 0;
+  grid-template-columns: minmax(0, 1fr) 440px;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  column-gap: 12px; row-gap: 10px;
+  padding: 0;
+}
+body.stage .menubar, body.stage .prompt, body.stage .status { grid-column: 1 / -1; }
+body.stage .colL { padding-left: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+body.stage .colR { padding-right: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+body.stage .win { margin: 0; }
+body.stage .wScale { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+body.stage #scaleWrap { flex: 1 1 auto; min-height: 0; }
+body.stage #scaleSvg { position: absolute; inset: 0; }
+body.stage #scaleSvg svg { width: 100%; height: 100%; }
+body.stage .tray { flex-wrap: nowrap; gap: 12px; padding-top: 20px; }
+body.stage .pc { width: 80px; height: 78px; flex: 0 0 auto; }
+body.stage .wKeys { font-size: 20px; }
+body.stage .how { text-align: left; }
+body.stage .keys { display: grid; grid-template-columns: auto auto; gap: 8px 18px; justify-content: start; justify-items: start; }
+body.stage .kc { text-align: left; white-space: nowrap; }
+body.stage .wMsg { flex: 1 1 auto; min-height: 0; overflow: auto; }
+body.stage #msg { min-height: 0; }
+
+@media (max-width: 520px) {
+  body { font-size: 20px; }
+  .win { margin: 0 8px; padding: 6px 8px 10px; }
+  .pc { width: 68px; height: 74px; }
+  .pc b { font-size: 32px; }
+  .keys { gap: 10px 16px; }
+}
+
+/* ---------- Touch screens: same DOS screen, sized for fingers. ----------
+   body.touch  = a finger is the main pointer (set from the media query, updated on first touch / key press).
+   body.compact = touch + portrait/narrow: one screen, SCALE, WEIGHTS, MESSAGE, KEYBOARD, status.
+   body.tland  = touch + landscape too short for the scaled 1280x720 stage: two columns at real size. */
+html { -webkit-tap-highlight-color: transparent; }
+body.touch { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+body.touch .pc { touch-action: none; }
+.pad { display: none; }
+body.touch .pad { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 10px; }
+.pk { font: inherit; background: none; border: 0; padding: 0; cursor: pointer; color: inherit; }
+.pk kbd { min-width: 54px; min-height: 46px; display: inline-flex; align-items: center; justify-content: center; }
+.pk:disabled { opacity: .4; cursor: default; }
+body.touch .kc.static { display: none; }
+body.touch .kc[data-act] kbd { display: none; }
+body.touch .kc[data-act] {
+  background: var(--grey); min-height: 46px; padding: 0 14px; justify-content: center;
+  border-bottom: 4px solid var(--dim); border-right: 2px solid var(--dim); transition: transform .05s;
+}
+body.touch .kc[data-act] span { color: var(--ink); }
+body.touch .kc[data-act].hit { transform: translateY(3px); border-bottom-width: 1px; background: var(--yellow); }
+body.touch .kc.go:disabled { display: none; }
+body.touch .kc.go:not(:disabled) { background: var(--green); order: -1; flex-basis: 100%; grid-column: 1 / -1; }
+body.touch .kc.go:not(:disabled) span { color: var(--ink); }
+body.touch .kc[data-act="snd"], body.touch .kc[data-act="theme"] { display: none; } /* both sit in the menu bar */
+body.touch.nofs .kc[data-act="full"] { display: none; }
+body.touch:not(.has-ng) .lg-ng, body.touch:not(.has-my) .lg-my,
+body.mini:not(.has-ng) .lg-ng, body.mini:not(.has-my) .lg-my { display: none; }
+.tghost { position: fixed; left: 0; top: 0; margin: 0; z-index: 50; pointer-events: none; opacity: .92; transition: none; }
+
+body.compact { padding: 0 env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px); }
+body.compact .screen {
+  max-width: none; min-height: 100vh; min-height: 100dvh; padding-bottom: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(130px, 1fr) auto auto auto auto auto; row-gap: 6px;
+}
+body.compact .colL, body.compact .colR { display: contents; }
+body.compact .menubar { order: 1; gap: 0 12px; font-size: 16px; }
+body.compact .menubar > span:first-child { display: none; }
+body.compact .prompt { order: 2; font-size: 16px; }
+body.compact .prompt .copy { font-size: 13px; }
+body.compact .wScale { order: 3; display: flex; flex-direction: column; }
+body.compact .wTray { order: 4; }
+body.compact .wMsg { order: 5; }
+body.compact .wKeys { order: 6; }
+body.compact .status { order: 7; font-size: 16px; gap: 0 14px; }
+body.compact .win { margin: 0 6px; padding: 0 6px 6px; }
+body.compact .win > legend { font-size: 16px; }
+body.compact .pc { width: 52px; height: 52px; padding-top: 4px; }
+body.compact .pc b { font-size: 26px; }
+body.compact .pc em { font-size: 11px; white-space: nowrap; }
+body.compact .pc.lift { transform: translateY(-6px); box-shadow: 4px 10px 0 var(--shade); }
+body.compact .tray { gap: 8px; padding-block: 8px 2px; }
+body.compact .legend { font-size: 14px; margin-top: 4px; }
+body.compact #msg { min-height: 2.3em; max-height: 4.6em; overflow: auto; font-size: 16px; }
+
+body.tland { height: 100%; padding: 0 env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px); overflow: hidden; font-size: 17px; }
+body.tland .screen {
+  max-width: none; height: 100vh; height: 100dvh; padding-bottom: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 40%);
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto; column-gap: 8px; row-gap: 6px;
+}
+body.tland .menubar, body.tland .prompt, body.tland .status, body.tland .foot { grid-column: 1 / -1; }
+body.tland .prompt { font-size: 16px; }
+body.tland .menubar, body.tland .status { font-size: 16px; }
+body.tland .win > legend { font-size: 15px; }
+body.tland #msg { font-size: 16px; }
+body.tland .colL { padding-left: 6px; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+body.tland .colR { padding-right: 6px; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+body.tland .win { margin: 0; padding: 0 6px 6px; }
+body.tland .wScale { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+body.tland .wMsg { flex: 1 1 auto; min-height: 0; overflow: auto; }
+body.tland #msg { min-height: 0; }
+body.tland .how { display: none; }
+body.tland .tray { gap: 6px; padding-block: 8px 2px; flex-wrap: nowrap; }
+body.tland .pc { flex: 0 1 48px; min-width: 36px; width: 48px; height: 48px; padding-top: 4px; box-shadow: 3px 3px 0 var(--shade); }
+body.tland .pc b { font-size: 22px; }
+body.tland .pc em { font-size: 10px; white-space: nowrap; }
+body.tland .pc.lift { transform: translateY(-6px); box-shadow: 3px 9px 0 var(--shade); }
+body.tland .legend { font-size: 14px; margin-top: 2px; }
+body.tland .pad { gap: 6px; margin-bottom: 6px; }
+body.tland .pk kbd { min-height: 40px; }
+body.tland .pad { flex-wrap: nowrap; }
+body.tland .pk kbd { min-width: 40px; padding: 0 6px; }
+body.tland .keys { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+body.tland .kc[data-act] { min-height: 40px; font-size: 15px; padding: 0 4px; white-space: nowrap; }
+body.tland .kc[data-act="full"] span { font-size: 0; } body.tland .kc[data-act="full"] span::before { content: 'FULL'; font-size: 15px; }
+
+body.compact .wScale #scaleWrap, body.tland #scaleWrap { flex: 1 1 auto; min-height: 0; }
+body.compact #scaleSvg, body.tland #scaleSvg { position: absolute; inset: 0; }
+body.compact #scaleSvg svg, body.tland #scaleSvg svg { width: 100%; height: 100%; }
+
+/* ---------- Minimal controls (body.mini = compact portrait or touch landscape) ----------
+   Tap the weights to play. Only three keys: UNDO, HINT, NEXT LEVEL. Real keyboard keys still all work.
+   The copyright moves from the command line to a footer at the very bottom. */
+.foot { display: none; }
+body.mini .foot { display: block; order: 8; text-align: center; color: var(--grey); font-size: 13px; padding: 2px 0 4px; }
+body.mini .prompt .copy { display: none; }
+body.mini .how, body.mini .pad, body.mini .kc.static, body.mini .kc[data-act] { display: none; }
+body.mini .keys { display: flex; flex-wrap: nowrap; gap: 8px; }
+body.mini .kc[data-act="undo"], body.mini .kc[data-act="hint"], body.mini .kc[data-act="next"],
+body.mini .kc.go:disabled, body.mini .kc.go:not(:disabled) {
+  display: flex; flex: 1 1 0; order: 0; min-width: 0; min-height: 46px; padding: 0 6px; justify-content: center;
+  background: var(--grey); border-bottom: 4px solid var(--dim); border-right: 2px solid var(--dim);
+  font-size: 18px; transition: transform .05s;
+}
+body.mini .kc[data-act] kbd { display: none; }
+body.mini .kc[data-act] span { color: var(--ink); white-space: nowrap; }
+body.mini .kc.go:not(:disabled) { background: var(--green); }
+body.mini .kc.go:not(:disabled) span { color: var(--ink); }
+body.mini .kc[data-act].hit { transform: translateY(3px); border-bottom-width: 1px; background: var(--yellow); }
+body.mini .wKeys { padding-top: 6px; }
+body.mini .kc[data-act="next"] span { font-size: 0; }
+body.mini .kc[data-act="next"] span::before { content: 'NEXT'; font-size: 18px; }
+body.tland.mini .kc[data-act="next"] span::before { font-size: 16px; }
+body.tland.mini .kc[data-act="undo"], body.tland.mini .kc[data-act="hint"], body.tland.mini .kc[data-act="next"] { min-height: 42px; font-size: 16px; }
+@media (prefers-reduced-motion: reduce) {
+  .cursor, .pc.hint { animation: none; }
+  .blk.drop, .blk.pulse, .pc.enter, .screen.flash::before { animation: none; }
+}
+</style>
+
+<div id="fit"><main class="screen" id="screen">
+  <div class="menubar">
+    <span>BALANCE.EXE</span>
+    <span id="lvl">LEVEL 01</span>
+    <span class="grow"></span>
+    <button id="bTheme" type="button" aria-label="Change colour theme">THEME CLASSIC</button>
+    <button id="bSnd" type="button" aria-label="Toggle sound">SND ON</button>
+  </div>
+  <div class="prompt"><span id="cmd"></span><span class="cursor" aria-hidden="true"></span><span class="copy">&copy; 2026 SimplifyX Solutions</span></div>
+
+  <div class="colL">
+  <fieldset class="win wScale">
+    <legend> SCALE </legend>
+    <div id="scaleWrap" aria-label="Scale with weights on both pans">
+      <div id="scaleSvg"></div>
+      <div id="fx"></div>
+    </div>
+  </fieldset>
+
+  <fieldset class="win wTray">
+    <legend> WEIGHTS </legend>
+    <div class="tray" id="tray"></div>
+    <div class="legend" id="legend">
+      <span>GREY = FIXED</span> &nbsp; <span>YELLOW = YOURS</span> &nbsp; <span>MAGENTA = BALLOON (NEGATIVE)</span> &nbsp; <span>CYAN ? = MYSTERY</span>
+    </div>
+  </fieldset>
+
+  </div>
+  <div class="colR">
+  <fieldset class="win wKeys">
+    <legend> KEYBOARD </legend>
+    <p class="how" id="how"></p>
+    <div class="pad" id="pad" aria-label="Arrow keys"><button class="pk" type="button" data-k="left" aria-label="Left"><kbd data-k="left">&#9668;</kbd></button><button class="pk" type="button" data-k="up" aria-label="Lift"><kbd data-k="up">&#9650;</kbd></button><button class="pk" type="button" data-k="down" aria-label="Put back"><kbd data-k="down">&#9660;</kbd></button><button class="pk" type="button" data-k="right" aria-label="Right"><kbd data-k="right">&#9658;</kbd></button><button class="pk" type="button" data-k="enter" aria-label="Enter"><kbd data-k="enter">ENTER</kbd></button></div>
+    <div class="keys" id="keys">
+      <span class="kc static" data-phase="pick"><kbd data-k="left">&#9668;</kbd><kbd data-k="right">&#9658;</kbd><span>PICK WEIGHT</span></span>
+      <span class="kc static" data-phase="pick"><kbd data-k="up">&#9650;</kbd><span>LIFT IT</span></span>
+      <span class="kc static" data-phase="lift"><kbd data-k="left">&#9668;</kbd><kbd data-k="right">&#9658;</kbd><span>CHOOSE PAN</span></span>
+      <span class="kc static" data-phase="lift"><kbd data-k="enter">ENTER</kbd><span>DROP</span></span>
+      <span class="kc static" data-phase="lift"><kbd data-k="down">&#9660;</kbd><span>PUT BACK</span></span>
+      <button class="kc" type="button" data-act="undo"><kbd>BKSP</kbd><span>UNDO</span></button>
+      <button class="kc" type="button" data-act="clear"><kbd>C</kbd><span>CLEAR</span></button>
+      <button class="kc" type="button" data-act="hint"><kbd>H</kbd><span>HINT</span></button>
+      <button class="kc go" type="button" data-act="next" disabled><kbd>ENTER</kbd><span>NEXT LEVEL</span></button>
+      <button class="kc" type="button" data-act="solve"><kbd>V</kbd><span>SOLUTION</span></button>
+      <button class="kc" type="button" data-act="skip"><kbd>X</kbd><span>SKIP</span></button>
+      <button class="kc" type="button" data-act="snd"><kbd>S</kbd><span id="sndLbl">SOUND ON</span></button>
+      <button class="kc" type="button" data-act="theme"><kbd>T</kbd><span>NEXT THEME</span></button>
+      <button class="kc" type="button" data-act="full"><kbd>F</kbd><span>FULL SCREEN</span></button>
+    </div>
+  </fieldset>
+
+  <fieldset class="win wMsg">
+    <legend> MESSAGE </legend>
+    <div id="msg" aria-live="polite"></div>
+  </fieldset>
+
+  </div>
+  <div class="status" id="status"></div>
+  <div class="foot">&copy; 2026 SimplifyX Solutions</div>
+</main></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  //#GEN-START
+  function rng(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gen(n) {
+    var r = rng(n * 9973 + 17);
+    var ri = function (a, b) { return a + Math.floor(r() * (b - a + 1)); };
+    var k = Math.min(3 + Math.floor(n / 2), 8);
+    var maxV = Math.min(6 + n * 2, 30);
+    var negN = n >= 8 ? Math.min(1 + Math.floor((n - 8) / 4), 3) : 0;
+    for (var att = 0; att < 500; att++) {
+      var vals = [], seen = {}, guard = 0;
+      while (vals.length < k && guard++ < 300) {
+        var v = vals.length < negN ? -ri(1, Math.max(2, Math.floor(maxV / 2))) : ri(1, maxV);
+        if (seen[v]) continue;
+        seen[v] = 1; vals.push(v);
+      }
+      if (vals.length < k) continue;
+      vals.sort(function (a, b) { return a - b; });
+      var sL = 0, sR = 0;
+      for (var i = 0; i < k; i++) {
+        var x = r();
+        if (x < 0.4) sL += vals[i]; else if (x < 0.8) sR += vals[i];
+      }
+      var d = sR - sL;
+      if (d === 0) continue;
+      var b = ri(2, Math.max(4, Math.floor(maxV * 0.8)));
+      var L0, R0;
+      if (d > 0) { L0 = b + d; R0 = b; } else { L0 = b; R0 = b - d; }
+      if (L0 < 1 || R0 < 1) continue;
+      var split = function (t) {
+        if (n >= 3 && t >= 2 && r() < 0.5) { var a = ri(1, t - 1); return [a, t - a]; }
+        return [t];
+      };
+      var fixL = split(L0).map(function (q) { return { v: q, my: false }; });
+      var fixR = split(R0).map(function (q) { return { v: q, my: false }; });
+      if (n >= 4 && r() < 0.5) {
+        var list = r() < 0.5 ? fixL : fixR;
+        list[Math.floor(r() * list.length)].my = true;
+      }
+      var best = null, tot = Math.pow(3, k);
+      for (var m = 0; m < tot; m++) {
+        var xx = m, l = L0, rr = R0, used = 0, asg = [];
+        for (var j = 0; j < k; j++) {
+          var dg = xx % 3; xx = (xx - dg) / 3; asg.push(dg);
+          if (dg === 1) { l += vals[j]; used++; } else if (dg === 2) { rr += vals[j]; used++; }
+        }
+        if (used > 0 && l === rr && (!best || used < best.used)) best = { used: used, asg: asg };
+      }
+      if (!best) continue;
+      return {
+        tray: vals.map(function (q, idx) { return { id: idx, v: q }; }),
+        fixed: { L: fixL, R: fixR },
+        par: best.used,
+        sol: best.asg.map(function (q) { return q === 1 ? 'L' : q === 2 ? 'R' : null; })
+      };
+    }
+    return {
+      tray: [{ id: 0, v: 2 }, { id: 1, v: 3 }, { id: 2, v: 5 }],
+      fixed: { L: [{ v: 8, my: false }], R: [{ v: 3, my: false }] },
+      par: 1, sol: [null, null, 'R']
+    };
+  }
+  //#GEN-END
+
+  var SAVE_KEY = 'balance-the-scale-dos';
+  var THEME_KEY = 'balance-the-scale-theme';
+  // Colour words are what the legend and messages call each block type in that theme.
+  var THEMES = [
+    { id: 'classic',  name: 'CLASSIC',  w: { fx: 'GREY',  pl: 'YELLOW', ng: 'MAGENTA', my: 'CYAN' } },
+    { id: 'slate',    name: 'SLATE',    w: { fx: 'GREY',  pl: 'GOLD',   ng: 'PURPLE',  my: 'BLUE' } },
+    { id: 'amber',    name: 'AMBER',    w: { fx: 'TAN',   pl: 'GOLD',   ng: 'RUST',    my: 'CREAM' } },
+    { id: 'phosphor', name: 'PHOSPHOR', w: { fx: 'GREEN', pl: 'LIME',   ng: 'PINK',    my: 'AQUA' } },
+    { id: 'lcd',      name: 'LCD',      w: { fx: 'OLIVE', pl: 'BROWN',  ng: 'PLUM',    my: 'TEAL' } }
+  ];
+  var themeIdx = 0;
+  function cap(w) { return w.charAt(0) + w.slice(1).toLowerCase(); }
+  function tw() { return THEMES[themeIdx].w; }
+  var state = {
+    level: 1, score: 0, confirm: false, busy: false, viewed: false, gained: 0, fixed: { L: [], R: [] }, tray: [], placed: {}, hist: [],
+    solved: false, awarded: false, hints: 0, hintId: null, par: 0, sol: [],
+    ang: 0, base: 0, target: 0, queue: [], move: 0, reveal: false, entering: false, dragId: null,
+    cur: 0, lift: null
+  };
+
+  // Touch mode: a finger is the main pointer. Changes layout and wording only, never rules.
+  var mqTouch = window.matchMedia ? window.matchMedia('(hover: none) and (pointer: coarse)') : null;
+  var touch = !!(mqTouch && mqTouch.matches);
+  function applyTheme() {
+    var T = THEMES[themeIdx], w = T.w;
+    document.documentElement.setAttribute('data-skin', T.id);
+    var lg = $('#legend');
+    if (lg) lg.innerHTML = '<div class="lgw"><span>' + w.fx + ' = FIXED</span> &nbsp; <span>' + w.pl + ' = YOURS</span> &nbsp; <span class="lg-ng">' +
+      w.ng + ' = BALLOON (NEGATIVE)</span> &nbsp; <span class="lg-my">' + w.my + ' ? = MYSTERY</span></div>' +
+      '<div class="lgs"><span><i class="sw fx"></i>FIXED</span><span><i class="sw pl"></i>YOURS</span>' +
+      '<span class="lg-ng"><i class="sw ng"></i>BALLOON &minus;</span><span class="lg-my"><i class="sw my"></i>? MYSTERY</span></div>';
+    var b = $('#bTheme');
+    if (b) b.textContent = 'THEME ' + T.name;
+  }
+  function loadTheme() {
+    try {
+      var id = localStorage.getItem(THEME_KEY);
+      for (var i = 0; i < THEMES.length; i++) if (THEMES[i].id === id) themeIdx = i;
+    } catch (e) { /* storage unavailable */ }
+    applyTheme();
+  }
+  function nextTheme() {
+    themeIdx = (themeIdx + 1) % THEMES.length;
+    try { localStorage.setItem(THEME_KEY, THEMES[themeIdx].id); } catch (e) { /* ignore */ }
+    applyTheme();
+    if (!state.solved && state.hintId === null) setMsg(introMsg());
+  }
+
+  function loadSave() {
+    try {
+      var s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+      if (s && s.level > 0) { state.level = s.level | 0; state.score = s.score | 0; }
+    } catch (e) { /* storage unavailable */ }
+  }
+  function save() {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ level: state.level, score: state.score })); } catch (e) { /* ignore */ }
+  }
+
+  // ---------------------------------------------------------------
+  // Sound: soft, close-mic'd clicks and thocks built from filtered
+  // noise and short sine sweeps. Every hit is slightly randomised so
+  // repeats never sound identical; weights pan to the side they land on.
+  // ---------------------------------------------------------------
+  var snd = true, unlocked = false, ac = null, master = null, noiseBuf = null;
+  function audio() {
+    if (ac) { if (ac.state === 'suspended') ac.resume(); return ac; }
+    try {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      master = ac.createGain(); master.gain.value = 0.9;
+      var comp = ac.createDynamicsCompressor();
+      master.connect(comp); comp.connect(ac.destination);
+      noiseBuf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.5), ac.sampleRate);
+      var d = noiseBuf.getChannelData(0);
+      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    } catch (e) { ac = null; }
+    return ac;
+  }
+  function ready() { return snd && unlocked && audio(); }
+  function outNode(pan) {
+    var g = ac.createGain();
+    if (ac.createStereoPanner) {
+      var p = ac.createStereoPanner(); p.pan.value = pan || 0;
+      g.connect(p); p.connect(master);
+    } else { g.connect(master); }
+    return g;
+  }
+  function noise(t, dur, freq, q, type, vol, pan) {
+    var s = ac.createBufferSource(); s.buffer = noiseBuf;
+    var f = ac.createBiquadFilter(); f.type = type || 'bandpass'; f.frequency.value = freq; f.Q.value = q || 1;
+    var g = outNode(pan);
+    s.connect(f); f.connect(g);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.start(t, Math.random() * 0.25); s.stop(t + dur + 0.03);
+  }
+  function tone(t, f0, f1, dur, vol, type, pan) {
+    var o = ac.createOscillator(); o.type = type || 'sine';
+    o.frequency.setValueAtTime(f0, t);
+    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    var g = outNode(pan);
+    o.connect(g);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.start(t); o.stop(t + dur + 0.03);
+  }
+  function jit(x, amt) { return x * (1 + (Math.random() * 2 - 1) * amt); }
+
+  function sThock(side, v) {           // weight lands on a pan: heavier value, lower thock
+    if (!ready()) return;
+    var t = ac.currentTime, pan = side === 'L' ? -0.55 : 0.55;
+    if (v < 0) {                        // balloon: soft rising bloop and a tiny pop
+      tone(t, jit(320, 0.05), jit(640, 0.05), 0.13, 0.22, 'sine', pan);
+      noise(t + 0.11, 0.03, 1400, 1, 'bandpass', 0.16, pan);
+      return;
+    }
+    var base = Math.max(85, 215 - Math.min(Math.abs(v), 30) * 4) * jit(1, 0.05);
+    tone(t, base * 1.7, base * 0.65, 0.11, 0.55, 'sine', pan);
+    noise(t, 0.04, jit(1900, 0.1), 0.8, 'bandpass', 0.3, pan);
+    noise(t, 0.07, jit(320, 0.1), 0.7, 'lowpass', 0.32, pan);
+    noise(t + 0.055, 0.02, jit(3200, 0.1), 1, 'bandpass', 0.09, pan);
+  }
+  function sLift() {                   // weight returns to the tray
+    if (!ready()) return;
+    var t = ac.currentTime;
+    tone(t, jit(560, 0.05), jit(400, 0.05), 0.05, 0.16, 'triangle', 0);
+    noise(t, 0.02, jit(3600, 0.1), 1, 'bandpass', 0.14, 0);
+  }
+  function sKey() {                    // small keycap click for the other keys
+    if (!ready()) return;
+    var t = ac.currentTime;
+    noise(t, 0.025, jit(2300, 0.1), 1.2, 'bandpass', 0.16, 0);
+    tone(t, jit(900, 0.05), jit(650, 0.05), 0.03, 0.07, 'triangle', 0);
+  }
+  var lastTick = 0;
+  function sTick() {                   // ratchet tick as the beam steps
+    if (!ready()) return;
+    var now = ac.currentTime;
+    if (now - lastTick < 0.035) return;
+    lastTick = now;
+    noise(now, 0.018, 1300 + Math.abs(state.ang) * 55, 3, 'bandpass', 0.07, 0);
+  }
+  function sSettle() {                 // beam comes to rest
+    if (!ready()) return;
+    var t = ac.currentTime;
+    noise(t, 0.1, 230, 0.6, 'lowpass', 0.3, 0);
+    tone(t, 120, 70, 0.15, 0.32, 'sine', 0);
+  }
+  function bell(t, f, vol, pan) {
+    tone(t, f, f, 1.7, vol * 0.5, 'sine', pan);
+    tone(t, f * 2.756, f * 2.756, 0.9, vol * 0.11, 'sine', pan);
+    tone(t, f * 5.4, f * 5.4, 0.4, vol * 0.04, 'sine', pan);
+  }
+  function sWin() {                    // warm thump, then a small chime run
+    if (!ready()) return;
+    var t = ac.currentTime + 0.05;
+    tone(t, 100, 48, 0.35, 0.45, 'sine', 0);
+    [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach(function (f, i) {
+      bell(t + 0.08 + i * 0.11, f, 0.34, (i - 2) * 0.25);
+    });
+    noise(t + 0.05, 0.6, 6500, 2, 'bandpass', 0.05, 0);
+  }
+  function sMove(i, n) {               // cursor step: tiny tick, panned and pitched by position
+    if (!ready()) return;
+    var t = ac.currentTime, frac = n > 1 ? i / (n - 1) : 0.5;
+    noise(t, 0.02, 1900 + frac * 1500, 2, 'bandpass', 0.09, (frac - 0.5) * 1.1);
+  }
+  function sTypeClick() {
+    if (!ready()) return;
+    var t = ac.currentTime;
+    noise(t, 0.015, jit(2600, 0.15), 1.5, 'bandpass', 0.05, 0);
+  }
+
+  // ---------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function sums() {
+    var l = 0, r = 0;
+    state.fixed.L.forEach(function (f) { l += f.v; });
+    state.fixed.R.forEach(function (f) { r += f.v; });
+    state.tray.forEach(function (p) {
+      if (state.lift && state.lift.id === p.id) return;
+      var s = state.placed[p.id];
+      if (s === 'L') l += p.v; else if (s === 'R') r += p.v;
+    });
+    return { l: l, r: r };
+  }
+  function placedCount() { return Object.keys(state.placed).length; }
+  function hasMystery() { return state.fixed.L.concat(state.fixed.R).some(function (f) { return f.my; }); }
+  function hasNeg() { return state.tray.some(function (p) { return p.v < 0; }); }
+
+  // The beam swings past its resting angle, then rocks back in a few smaller swings.
+  function updateTarget() {
+    var s = sums(), d = s.l - s.r;
+    var base = d === 0 ? 0 : Math.round(Math.sign(d) * Math.min(15, Math.max(3, Math.abs(d) * 1.5)));
+    if (base === state.base && state.target === state.base && !state.queue.length) return;
+    var dir = Math.sign(base - state.ang);
+    state.move = Math.abs(base - state.ang);
+    state.base = base;
+    if (dir === 0 || reduce) { state.queue = []; state.target = base; return; }
+    state.target = Math.max(-17, Math.min(17, base + dir * 2));
+    state.queue = [base - dir * 1.5, base + dir * 0.5, base];
+  }
+
+  var typeTimer;
+  function typeLine(txt) {
+    clearTimeout(typeTimer);
+    var el = $('#cmd');
+    if (reduce) { el.textContent = txt; return; }
+    var i = 0;
+    (function step() {
+      el.textContent = txt.slice(0, ++i);
+      if (i % 2 === 0) sTypeClick();
+      if (i < txt.length) typeTimer = setTimeout(step, 22);
+    })();
+  }
+  function setMsg(html) { $('#msg').innerHTML = html; }
+
+  // ---------------------------------------------------------------
+  // Drawing. The scale is built once per change, then only posed each
+  // animation frame, so the drop animation on a new block keeps running.
+  // ---------------------------------------------------------------
+  var BW = 46, BH = 30, GAP = 6, ROWGAP = 4, HANG = 150, PANHALF = 100;
+  var els = {};
+  function sideItems(side) {
+    var items = [];
+    state.fixed[side].forEach(function (f) {
+      items.push({ label: f.my && !state.solved ? '?' : String(f.v), cls: f.my ? 'my' : 'fx', id: null });
+    });
+    state.tray.forEach(function (p) {
+      if (state.lift && state.lift.id === p.id) return;
+      if (state.placed[p.id] === side) items.push({ label: String(p.v), cls: p.v < 0 ? 'ng' : 'pl', id: p.id });
+    });
+    if (state.lift && state.lift.side === side) {
+      var gv = state.tray[state.lift.id].v;
+      items.push({ label: String(gv), cls: gv < 0 ? 'ng ghost' : 'ghost', id: null });
+    }
+    return items;
+  }
+  function drawItems(items, freshId) {
+    var out = '';
+    items.forEach(function (it, i) {
+      var row = Math.floor(i / 4), col = i % 4;
+      var inRow = Math.min(4, items.length - row * 4);
+      var x = -(inRow * BW + (inRow - 1) * GAP) / 2 + col * (BW + GAP);
+      var y = HANG - (row + 1) * (BH + ROWGAP);
+      var cls = it.cls + (it.id !== null && it.id === freshId ? ' drop' : '') + (it.cls === 'my' && state.reveal ? ' pulse' : '');
+      var did = it.id === null ? '' : ' data-id="' + it.id + '"';
+      var shape = it.cls.indexOf('ng') === 0
+        ? '<ellipse cx="' + (x + BW / 2) + '" cy="' + (y + BH / 2) + '" rx="' + (BW / 2) + '" ry="' + (BH / 2 + 1) + '"/>'
+        : '<rect x="' + x + '" y="' + y + '" width="' + BW + '" height="' + BH + '"/>';
+      out += '<g class="blk ' + cls + '"' + did + '>' + shape +
+        '<text x="' + (x + BW / 2) + '" y="' + (y + BH - 7) + '">' + it.label + '</text></g>';
+    });
+    return out;
+  }
+  function panGroup(side, freshId) {
+    var s = '<g id="pan' + side + '">';
+    s += '<line class="string" x1="0" y1="0" x2="' + (-PANHALF + 6) + '" y2="' + HANG + '"/>';
+    s += '<line class="string" x1="0" y1="0" x2="' + (PANHALF - 6) + '" y2="' + HANG + '"/>';
+    s += '<rect class="pan" x="' + (-PANHALF) + '" y="' + HANG + '" width="' + (PANHALF * 2) + '" height="10"/>';
+    s += drawItems(sideItems(side), freshId);
+    s += '<text class="sidelabel" x="0" y="' + (HANG + 34) + '">' + (side === 'L' ? 'LEFT' : 'RIGHT') + '</text>';
+    return s + '</g>';
+  }
+  function buildScale(freshId) {
+    var svg = '<svg viewBox="0 0 640 350" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">';
+    svg += '<rect class="post" x="313" y="64" width="14" height="250"/>';
+    svg += '<rect class="post" x="230" y="314" width="180" height="14"/>';
+    svg += '<line id="beam" class="beam' + (state.solved ? ' ok' : '') + '"/>';
+    svg += panGroup('L', freshId) + panGroup('R', freshId);
+    svg += '<circle class="pivot' + (state.solved ? ' ok' : '') + '" cx="320" cy="64" r="11"/>';
+    svg += '</svg>';
+    $('#scaleSvg').innerHTML = svg;
+    els.beam = $('#beam'); els.pl = $('#panL'); els.pr = $('#panR');
+    poseScale();
+    state.reveal = false;
+  }
+  function poseScale() {
+    if (!els.beam) return;
+    var px = 320, py = 64, half = 220, a = state.ang * Math.PI / 180;
+    var c = half * Math.cos(a), s = half * Math.sin(a);
+    els.beam.setAttribute('x1', px - c); els.beam.setAttribute('y1', py + s);
+    els.beam.setAttribute('x2', px + c); els.beam.setAttribute('y2', py - s);
+    els.pl.setAttribute('transform', 'translate(' + (px - c) + ' ' + (py + s) + ')');
+    els.pr.setAttribute('transform', 'translate(' + (px + c) + ' ' + (py - s) + ')');
+  }
+  function drawTray() {
+    var enter = state.entering;
+    $('#tray').innerHTML = state.tray.map(function (p) {
+      var held = state.lift && state.lift.id === p.id;
+      var cur = held ? null : (state.placed[p.id] || null);
+      var cls = 'pc' + (p.v < 0 ? ' neg' : '') + (cur ? ' on' + cur : '') +
+        (held ? ' lift' : '') + (state.cur === p.id && !state.solved ? ' cur' : '') +
+        (state.hintId === p.id ? ' hint' : '') + (enter ? ' enter' : '');
+      var lab = held ? '&#9650; ' + (state.lift.side === 'L' ? 'LEFT' : 'RIGHT')
+        : cur === 'L' ? '&#9668; LEFT' : cur === 'R' ? 'RIGHT &#9658;' : 'TRAY';
+      return '<button type="button" class="' + cls + '" style="--i:' + p.id + '" data-id="' + p.id + '"' +
+        (state.solved ? ' disabled' : touch ? '' : ' draggable="true"') + ' aria-label="Weight ' + p.v + ', ' +
+        (held ? 'held above the ' + (state.lift.side === 'L' ? 'left' : 'right') + ' pan' : cur === 'L' ? 'on left pan' : cur === 'R' ? 'on right pan' : 'in tray') + '">' +
+        '<b>' + p.v + '</b><em>' + lab + '</em></button>';
+    }).join('');
+    state.entering = false;
+  }
+  function drawChrome() {
+    $('#lvl').textContent = 'LEVEL ' + pad(state.level);
+    $('#bSnd').textContent = snd ? 'SND ON' : 'SND OFF';
+    $('#sndLbl').textContent = snd ? 'SOUND ON' : 'SOUND OFF';
+    var q = function (a) { return document.querySelector('.kc[data-act="' + a + '"]'); };
+    q('undo').disabled = state.solved || state.hist.length === 0;
+    q('hint').disabled = state.solved || state.busy;
+    q('solve').disabled = state.solved || state.busy;
+    q('next').disabled = !state.solved;
+    var phase = state.lift ? 'lift' : 'pick';
+    Array.prototype.forEach.call(document.querySelectorAll('.kc[data-phase]'), function (el) {
+      el.classList.toggle('dim', state.solved || el.getAttribute('data-phase') !== phase);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.pk'), function (el) {
+      el.disabled = state.busy || (state.solved && el.getAttribute('data-k') !== 'enter');
+    });
+    $('#how').innerHTML = state.busy ? 'Showing the solution...'
+      : touch ? (state.solved ? 'Level cleared. Tap <b>NEXT LEVEL</b>.'
+        : state.lift ? 'Pick a pan with <b>&#9668; &#9658;</b>, tap <b>ENTER</b> to drop. <b>&#9660;</b> puts it back.'
+        : 'Tap a weight: TRAY, LEFT, RIGHT. Or use <b>&#9668; &#9658;</b> and <b>&#9650;</b>.')
+      : state.solved ? 'Level cleared. Press <b>ENTER</b> for the next one.'
+      : state.lift ? 'Choose a pan with <b>&#9668; &#9658;</b>, then press <b>ENTER</b> to drop it. <b>&#9660;</b> puts it back.'
+      : 'Move over a weight with <b>&#9668; &#9658;</b>, then lift it with <b>&#9650;</b>.';
+    var hold = state.lift
+      ? '<span>HOLDING ' + state.tray[state.lift.id].v + ' ABOVE THE ' + (state.lift.side === 'L' ? 'LEFT' : 'RIGHT') + ' PAN</span>' : '';
+    $('#status').innerHTML = hold + '<span>GOAL ' + state.par + '</span><span>USED ' + placedCount() +
+      '</span><span>HINTS ' + state.hints + '</span><span>SCORE ' + ('0000' + state.score).slice(-Math.max(4, String(state.score).length)) + '</span>';
+  }
+  function render(freshId) { drawChrome(); drawTray(); buildScale(freshId); }
+
+  function flashEl(el) {
+    if (!el) return;
+    el.classList.add('hit');
+    setTimeout(function () { el.classList.remove('hit'); }, 130);
+  }
+  function flashTray(id) { flashEl(document.querySelector('.pc[data-id="' + id + '"]')); }
+  function flashKey(act) { flashEl(document.querySelector('.kc[data-act="' + act + '"]')); }
+  function flashK(name) {
+    Array.prototype.forEach.call(document.querySelectorAll('kbd[data-k="' + name + '"]'), flashEl);
+  }
+
+  function sparkle() {
+    var fx = $('#fx'), chars = ['*', '+', '.', '*', "'", 'o', 'x'];
+    var cols = ['var(--cyan)', 'var(--yellow)', 'var(--green)', 'var(--white)'];
+    for (var i = 0; i < 30; i++) {
+      var sp = document.createElement('span');
+      var ang = Math.random() * Math.PI * 2, dist = 70 + Math.random() * 190;
+      sp.className = 'sp';
+      sp.textContent = chars[i % chars.length];
+      sp.style.color = cols[i % cols.length];
+      sp.style.setProperty('--dx', Math.round(Math.cos(ang) * dist) + 'px');
+      sp.style.setProperty('--dy', Math.round(Math.sin(ang) * dist * 0.7 - 30) + 'px');
+      sp.style.animationDelay = Math.round(Math.random() * 120) + 'ms';
+      fx.appendChild(sp);
+    }
+    setTimeout(function () { fx.innerHTML = ''; }, 1500);
+    var sc = $('#screen');
+    sc.classList.remove('flash'); void sc.offsetWidth; sc.classList.add('flash');
+  }
+
+  // ---------------------------------------------------------------
+  // Game actions
+  // ---------------------------------------------------------------
+  var ORDER = [null, 'L', 'R'];
+  function apply(id, next, silentHist) {
+    if (state.solved) return;
+    state.lift = null;
+    var cur = state.placed[id] || null;
+    if (cur === next) return;
+    if (!silentHist) state.hist.push({ id: id, prev: cur });
+    if (next) state.placed[id] = next; else delete state.placed[id];
+    state.hintId = null;
+    if (next) sThock(next, state.tray[id].v); else sLift();
+    updateTarget();
+    checkWin();
+    render(next ? id : null);
+    flashTray(id);
+  }
+  function cycle(id, dir) {
+    if (state.solved || id < 0 || id >= state.tray.length) return;
+    state.lift = null; state.cur = id;
+    var i = ORDER.indexOf(state.placed[id] || null);
+    apply(id, ORDER[(i + dir + 3) % 3]);
+  }
+
+  // Arrow-key flow: cursor over the tray, lift a weight, choose a pan, drop it.
+  function defaultSide(i) { return i < state.tray.length / 2 ? 'L' : 'R'; }
+  function moveCursor(d) {
+    var n = state.tray.length;
+    state.cur = (state.cur + d + n) % n;
+    sMove(state.cur, n);
+    render(null);
+  }
+  function lift(id) {
+    if (state.solved || state.lift) return;
+    var cur = state.placed[id] || null;
+    state.lift = { id: id, side: cur || defaultSide(id) };
+    state.hintId = null;
+    sLift();
+    updateTarget();
+    render(null);
+  }
+  function setSide(side) {
+    if (!state.lift || state.lift.side === side) return;
+    state.lift.side = side;
+    sKey();
+    render(null);
+  }
+  function drop() {
+    var L = state.lift;
+    if (!L) return;
+    state.lift = null;
+    if (state.placed[L.id] === L.side) {   // put back on the pan it came from
+      sThock(L.side, state.tray[L.id].v);
+      updateTarget();
+      render(L.id);
+      flashTray(L.id);
+    } else {
+      apply(L.id, L.side);
+    }
+  }
+  function cancelLift() {
+    if (!state.lift) return;
+    state.lift = null;
+    sLift();
+    updateTarget();
+    render(null);
+  }
+  function takeOff(id) { if (state.placed[id]) apply(id, null); }
+  function undo() {
+    if (state.lift) { cancelLift(); return; }
+    if (state.solved || !state.hist.length) return;
+    var h = state.hist.pop();
+    apply(h.id, h.prev, true);
+  }
+  function reset() {
+    state.placed = {}; state.hist = []; state.hintId = null; state.solved = false; state.lift = null;
+    updateTarget();
+    setMsg(introMsg());
+    render(null);
+  }
+  function hint() {
+    if (state.solved) return;
+    state.lift = null;
+    var id = null;
+    for (var i = 0; i < state.tray.length; i++) {
+      if ((state.sol[i] || null) !== (state.placed[i] || null)) { id = i; break; }
+    }
+    if (id === null) return;
+    state.hints++;
+    state.hintId = id;
+    state.cur = id;
+    var want = state.sol[id] || null;
+    var v = state.tray[id].v;
+    var txt = tapping()
+      ? (want ? 'HINT: weight ' + v + ' belongs on the ' + (want === 'L' ? 'LEFT' : 'RIGHT') + ' pan. It is blinking. ' + V() + ' it until it says ' + (want === 'L' ? 'LEFT' : 'RIGHT') + '.'
+        : 'HINT: weight ' + v + ' should not be on the scale. It is blinking. ' + V() + ' it until it says TRAY.')
+      : want
+      ? 'HINT: weight ' + v + ' belongs on the ' + (want === 'L' ? 'LEFT' : 'RIGHT') + ' pan. The cursor is on it. Lift it with the up arrow, pick the ' + (want === 'L' ? 'left' : 'right') + ' pan, then press ENTER.'
+      : 'HINT: weight ' + v + ' should not be on the scale. The cursor is on it. Press the down arrow to take it off.';
+    setMsg('<span class="warn">' + txt + '</span><br>Each hint takes 25 points off this level.');
+    render(null);
+  }
+  // Show the solution: first press asks, second press places the answer one weight at a time.
+  function showSolution() {
+    if (state.solved || state.busy) return;
+    if (!state.confirm) {
+      state.confirm = true; state.lift = null; state.hintId = null;
+      setMsg(touch
+        ? '<span class="warn">Show the solution?</span> Tap SOLUTION again to see it. This level then scores 0 points.<br>Tap anything else to keep trying.'
+        : '<span class="warn">Show the solution?</span> Press V again to see it. This level then scores 0 points.<br>Press any other key to keep trying.');
+      render(null);
+      return;
+    }
+    state.confirm = false; state.busy = true; state.lift = null; state.hintId = null; state.hist = [];
+    var had = placedCount() > 0;
+    state.placed = {};
+    if (had) sLift();
+    updateTarget();
+    setMsg('Here is one way to balance it, using the fewest weights.');
+    render(null);
+    var steps = [];
+    state.sol.forEach(function (sd, i) { if (sd) steps.push(i); });
+    var k = 0;
+    function next() {
+      if (k >= steps.length) { finishSolution(); return; }
+      var id = steps[k++];
+      state.placed[id] = state.sol[id]; state.cur = id;
+      sThock(state.sol[id], state.tray[id].v);
+      updateTarget();
+      render(id);
+      setTimeout(next, reduce ? 0 : 480);
+    }
+    setTimeout(next, reduce ? 0 : 420);
+  }
+  function finishSolution() {
+    state.busy = false; state.solved = true; state.awarded = true; state.viewed = true; state.reveal = true;
+    var L = [], R = [], mys = '';
+    state.sol.forEach(function (sd, i) { if (sd === 'L') L.push(state.tray[i].v); else if (sd === 'R') R.push(state.tray[i].v); });
+    state.fixed.L.concat(state.fixed.R).forEach(function (f) { if (f.my) mys = '<br>The mystery block was ' + f.v + '.'; });
+    setMsg('<span class="ttl">SOLUTION</span>' +
+      (L.length ? '<br>LEFT pan: ' + L.join(', ') : '') + (R.length ? '<br>RIGHT pan: ' + R.join(', ') : '') + mys +
+      '<br>No points for this level. ' + nextWord());
+    save();
+    render(null);
+  }
+  function cancelConfirm() {
+    if (!state.confirm) return false;
+    state.confirm = false;
+    setMsg(introMsg());
+    render(null);
+    return true;
+  }
+
+  function checkWin() {
+    var s = sums();
+    if (s.l !== s.r || placedCount() === 0) return;
+    state.solved = true;
+    state.reveal = true;
+    var used = placedCount(), pts = 100, lines = ['Balanced: +100'];
+    if (used <= state.par) { pts += 50; lines.push('Goal reached with ' + used + ' weight' + (used === 1 ? '' : 's') + ': +50'); }
+    else if (used === state.par + 1) { pts += 20; lines.push('One weight over the goal: +20'); }
+    else lines.push('Goal was ' + state.par + ', you used ' + used + ': no bonus');
+    if (state.hints > 0) { pts -= 25 * state.hints; lines.push('Hints: -' + (25 * state.hints)); }
+    pts = Math.max(10, pts);
+    if (!state.awarded) { state.awarded = true; state.score += pts; state.gained = pts; }
+    sWin();
+    if (!reduce) sparkle();
+    var mys = '';
+    state.fixed.L.concat(state.fixed.R).forEach(function (f) { if (f.my) mys = '<br>The mystery block was ' + f.v + '.'; });
+    setMsg('<span class="ttl">*** BALANCED ***  +' + state.gained + ' POINTS</span>' + mys +
+      '<br>' + lines.join('<br>') + '<br>' + nextWord());
+    save();
+  }
+  // Minimal layouts (phones, narrow panels) show no arrow keys, so the wording talks about tapping or clicking the weights.
+  function mini() { return document.body.classList.contains('mini'); }
+  function tapping() { return touch || mini(); }
+  function V() { return touch ? 'Tap' : 'Click'; }
+  function nextWord() { return tapping() ? V() + ' ' + (mini() ? 'NEXT' : 'NEXT LEVEL') + ' to go on.' : 'Press ENTER for the next level.'; }
+  function introMsg() {
+    var t = tapping() ? V() + ' a weight to put it on the LEFT pan. ' + V() + ' again for RIGHT, once more to take it off. You can also drag it onto a pan.'
+      : "Move over a weight with the left and right arrows and lift it with the up arrow. Choose a pan, then press ENTER to drop it.";
+    if (state.level > 1) t = 'Level the scale. Reach the goal for bonus points.';
+    if (hasMystery()) t = 'The ' + tw().my.toLowerCase() + ' ? block hides a number. Level the scale and it shows itself.';
+    if (hasNeg()) t = cap(tw().ng) + ' balloons have negative weight. A balloon on a pan makes that pan lighter.';
+    return t + '<br>Goal: balance it with ' + state.par + ' weight' + (state.par === 1 ? '' : 's') + '. That is the fewest possible.';
+  }
+  function load(n) {
+    var L = gen(n);
+    state.level = n; state.fixed = L.fixed; state.tray = L.tray; state.par = L.par; state.sol = L.sol;
+    state.placed = {}; state.hist = []; state.solved = false; state.awarded = false;
+    state.hints = 0; state.hintId = null; state.reveal = false; state.entering = true;
+    state.cur = 0; state.lift = null; state.confirm = false; state.busy = false; state.viewed = false; state.gained = 0;
+    state.ang = 0; state.base = 0; state.target = 0; state.queue = [];
+    document.body.classList.toggle('has-ng', hasNeg());
+    document.body.classList.toggle('has-my', hasMystery());
+    updateTarget();
+    setMsg(introMsg());
+    typeLine('C:\\BALANCE> LOAD LEVEL ' + pad(n));
+    save();
+    render(null);
+  }
+  function nextLevel() { load(state.level + 1); }
+  function toggleSound() { snd = !snd; if (snd) { unlocked = true; sKey(); } drawChrome(); }
+
+  // Beam animation: chunky half-degree steps at a low frame rate, with a ratchet tick per step.
+  setInterval(function () {
+    if (state.ang !== state.target) {
+      var d = state.target - state.ang;
+      var step = reduce || Math.abs(d) <= 1.5 ? d : Math.sign(d) * 1.5;
+      state.ang = Math.round((state.ang + step) * 2) / 2;
+      poseScale();
+      sTick();
+      if (state.ang === state.target && !state.queue.length && state.move >= 2) sSettle();
+    } else if (state.queue.length) {
+      state.target = state.queue.shift();
+    }
+  }, 45);
+
+  // ---------------------------------------------------------------
+  // Input
+  // ---------------------------------------------------------------
+  function act(a) {
+    if (state.busy && a !== 'snd' && a !== 'theme' && a !== 'full') return;
+    if (a !== 'solve' && a !== 'snd' && a !== 'theme' && a !== 'full' && cancelConfirm()) return;
+    if (a === 'solve') { sKey(); showSolution(); return; }
+    if (a === 'undo') { sKey(); undo(); }
+    else if (a === 'clear') { sKey(); reset(); }
+    else if (a === 'hint') { sKey(); hint(); }
+    else if (a === 'skip') { sKey(); nextLevel(); }
+    else if (a === 'next') { if (state.solved) { sKey(); nextLevel(); } }
+    else if (a === 'snd') { toggleSound(); }
+    else if (a === 'theme') { sKey(); nextTheme(); }
+    else if (a === 'full') { toggleFull(); }
+  }
+  function unlock() { unlocked = true; if (snd) audio(); }
+  document.addEventListener('pointerdown', unlock, { once: true });
+
+  $('#keys').addEventListener('click', function (e) {
+    var b = e.target.closest('.kc[data-act]');
+    if (!b || b.disabled) return;
+    unlock();
+    act(b.getAttribute('data-act'));
+    if (e.detail > 0) b.blur();
+  });
+  $('#bTheme').addEventListener('click', function (e) { unlock(); sKey(); nextTheme(); if (e.detail > 0) e.currentTarget.blur(); });
+  $('#bSnd').addEventListener('click', function (e) { unlock(); toggleSound(); if (e.detail > 0) e.currentTarget.blur(); });
+
+  // On-screen arrow keys: the same moves as the real arrow keys and ENTER.
+  function press(k) {
+    if (state.busy) return;
+    if (state.confirm) { cancelConfirm(); return; }
+    if (k === 'enter') {
+      if (state.solved) { flashKey('next'); act('next'); }
+      else { flashK('enter'); if (state.lift) drop(); else lift(state.cur); }
+      return;
+    }
+    if (state.solved) return;
+    flashK(k);
+    if (k === 'left' || k === 'right') { if (state.lift) setSide(k === 'left' ? 'L' : 'R'); else moveCursor(k === 'left' ? -1 : 1); }
+    else if (k === 'up') lift(state.cur);
+    else if (k === 'down') { if (state.lift) cancelLift(); else takeOff(state.cur); }
+  }
+  $('#pad').addEventListener('click', function (e) {
+    var b = e.target.closest('.pk');
+    if (!b || b.disabled) return;
+    unlock();
+    press(b.getAttribute('data-k'));
+    if (e.detail > 0) b.blur();
+  });
+
+  var trayEl = $('#tray');
+  var noClick = false;
+  trayEl.addEventListener('click', function (e) {
+    var b = e.target.closest('.pc');
+    if (noClick) { noClick = false; return; }
+    if (!b || b.disabled || state.busy) return;
+    unlock();
+    if (cancelConfirm()) return;
+    cycle(+b.getAttribute('data-id'), 1);
+  });
+  trayEl.addEventListener('contextmenu', function (e) {
+    var b = e.target.closest('.pc');
+    if (!b) return;
+    e.preventDefault();
+    if (!b.disabled && !state.busy) { unlock(); cancelConfirm(); cycle(+b.getAttribute('data-id'), -1); }
+  });
+  trayEl.addEventListener('dragstart', function (e) {
+    var b = e.target.closest('.pc');
+    if (!b) return;
+    state.dragId = +b.getAttribute('data-id');
+    try { e.dataTransfer.setData('text/plain', String(state.dragId)); e.dataTransfer.effectAllowed = 'move'; } catch (err) { /* ignore */ }
+  });
+  var wrap = $('#scaleWrap');
+  wrap.addEventListener('dragover', function (e) { e.preventDefault(); });
+  wrap.addEventListener('drop', function (e) {
+    e.preventDefault();
+    if (state.dragId === null || state.busy) { state.dragId = null; return; }
+    var box = wrap.getBoundingClientRect();
+    var side = e.clientX < box.left + box.width / 2 ? 'L' : 'R';
+    var id = state.dragId; state.dragId = null;
+    unlock();
+    apply(id, side);
+  });
+  wrap.addEventListener('click', function (e) {
+    var g = e.target.closest('.blk[data-id]');
+    if (g && !state.busy) { unlock(); cancelConfirm(); apply(+g.getAttribute('data-id'), null); }
+  });
+
+  // Touch drag: lift a weight with a finger and let go over a pan. Letting go off the scale takes it off.
+  var td = null;
+  trayEl.addEventListener('pointerdown', function (e) {
+    if (e.pointerType === 'mouse') return;
+    var b = e.target.closest('.pc');
+    if (!b || b.disabled || state.busy) return;
+    td = { id: +b.getAttribute('data-id'), x: e.clientX, y: e.clientY, el: b, pid: e.pointerId, g: null };
+  });
+  document.addEventListener('pointermove', function (e) {
+    if (!td || e.pointerId !== td.pid) return;
+    var dx = e.clientX - td.x, dy = e.clientY - td.y;
+    if (!td.g) {
+      if (dx * dx + dy * dy < 144) return;
+      var r = td.el.getBoundingClientRect();
+      var g = td.el.cloneNode(true);
+      g.className = 'pc tghost' + (td.el.classList.contains('neg') ? ' neg' : '');
+      g.style.width = r.width + 'px'; g.style.height = r.height + 'px';
+      g.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(g);
+      td.g = g; td.w = r.width; td.h = r.height;
+      unlock(); cancelConfirm(); state.lift = null; sLift();
+    }
+    td.g.style.transform = 'translate(' + Math.round(e.clientX - td.w / 2) + 'px,' + Math.round(e.clientY - td.h * 0.85) + 'px)';
+  });
+  function endDrag(e) {
+    if (!td || e.pointerId !== td.pid) return;
+    var d = td; td = null;
+    if (!d.g) return;
+    d.g.remove();
+    noClick = true; setTimeout(function () { noClick = false; }, 350);
+    if (e.type !== 'pointerup' || state.busy || state.solved) return;
+    var box = wrap.getBoundingClientRect();
+    var inside = e.clientX >= box.left && e.clientX <= box.right && e.clientY >= box.top && e.clientY <= box.bottom;
+    state.cur = d.id;
+    if (inside) apply(d.id, e.clientX < box.left + box.width / 2 ? 'L' : 'R');
+    else if (state.placed[d.id]) apply(d.id, null);
+    else render(null);
+  }
+  document.addEventListener('pointerup', endDrag);
+  document.addEventListener('pointercancel', endDrag);
+
+  // Switch wording and layout when the player changes how they play (touch screen laptops, tablets with keyboards).
+  function setTouch(on) {
+    if (touch === on) return;
+    touch = on;
+    document.body.classList.toggle('touch', on);
+    Array.prototype.forEach.call(document.querySelectorAll('.pc'), function (b) { b.draggable = !on && !state.solved; });
+    fit();
+    if (!state.solved && !state.busy && !state.confirm && state.hintId === null) setMsg(introMsg());
+    drawChrome();
+  }
+  document.addEventListener('pointerdown', function (e) {
+    if (e.pointerType === 'touch') setTouch(true);
+    else if (e.pointerType === 'mouse' && !(mqTouch && mqTouch.matches)) setTouch(false);
+  }, true);
+  // Tapping empty space cancels the "show the solution?" question.
+  document.addEventListener('click', function (e) {
+    if (state.confirm && !e.target.closest('button, .blk')) cancelConfirm();
+  });
+  // iOS only lets audio start inside a tap; resume it on every tap in case the phone paused it.
+  document.addEventListener('touchend', function () {
+    if (unlocked && snd && ac && ac.state !== 'running') { try { ac.resume(); } catch (err) { /* ignore */ } }
+  }, { passive: true });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (touch && !e.repeat && /^(arrow|enter|escape|backspace| |[a-z]$)/.test((e.key || '').toLowerCase())) setTouch(false);
+    unlock();
+    var k = (e.key || '').toLowerCase();
+    if (k === 'v') { if (!e.repeat) { flashKey('solve'); act('solve'); } e.preventDefault(); return; }
+    if (state.busy && k !== 's' && k !== 't' && k !== 'f') { e.preventDefault(); return; }
+    if (state.confirm && k !== 's' && k !== 't' && k !== 'f' && !e.repeat) { e.preventDefault(); cancelConfirm(); return; }
+    var onBtn = e.target && e.target.tagName === 'BUTTON';
+    if ((k === 'enter' || k === ' ') && onBtn) return;
+    if (k === 'arrowleft' || k === 'arrowright') {
+      e.preventDefault();
+      if (state.solved) return;
+      var left = k === 'arrowleft';
+      flashK(left ? 'left' : 'right');
+      if (state.lift) { if (!e.repeat) setSide(left ? 'L' : 'R'); }
+      else moveCursor(left ? -1 : 1);
+      return;
+    }
+    if (k === 'arrowup' || k === 'arrowdown' || k === 'escape') {
+      e.preventDefault();
+      if (e.repeat || state.solved) return;
+      if (k === 'arrowup') { flashK('up'); lift(state.cur); }
+      else if (state.lift) { flashK('down'); cancelLift(); }
+      else if (k === 'arrowdown') { flashK('down'); takeOff(state.cur); }
+      return;
+    }
+    if (k === 'enter' || k === ' ') {
+      e.preventDefault();
+      if (e.repeat) return;
+      if (state.solved) { flashKey('next'); act('next'); }
+      else { flashK('enter'); if (state.lift) drop(); else lift(state.cur); }
+      return;
+    }
+    if (e.repeat) return;
+    if (k === 'backspace') { e.preventDefault(); flashKey('undo'); act('undo'); }
+    else if (k === 'c') { flashKey('clear'); act('clear'); }
+    else if (k === 'h') { flashKey('hint'); act('hint'); }
+    else if (k === 'x') { flashKey('skip'); act('skip'); }
+    else if (k === 's') { flashKey('snd'); act('snd'); }
+    else if (k === 't') { flashKey('theme'); act('theme'); }
+    else if (k === 'f') { flashKey('full'); act('full'); }
+  });
+
+  // Fit a 1280x720 screen to the window; portrait and narrow windows get the stacked layout.
+  function fit() {
+    var W = window.innerWidth, H = window.innerHeight;
+    var stage = W / H >= 1.15 && W >= 560;
+    var s = Math.min((W - 24) / 1280, (H - 24) / 720);
+    // On touch, a stage shrunk below ~70% makes keys too small to tap: use the real-size landscape layout instead.
+    var tland = touch && stage && s < 0.7;
+    if (tland) stage = false;
+    document.body.classList.toggle('stage', stage);
+    document.body.classList.toggle('tland', tland);
+    document.body.classList.toggle('compact', !stage && !tland);
+    var wasMini = mini();
+    document.body.classList.toggle('mini', !stage);
+    if (wasMini !== mini() && state.tray.length && !state.solved && !state.busy && !state.confirm && state.hintId === null) setMsg(introMsg());
+    var sc = $('#screen'), box = $('#fit');
+    if (!stage) { sc.style.transform = ''; box.style.width = ''; box.style.height = ''; return; }
+    sc.style.transform = 'scale(' + s + ')';
+    box.style.width = Math.floor(1280 * s) + 'px';
+    box.style.height = Math.floor(720 * s) + 'px';
+  }
+  function toggleFull() {
+    try {
+      if (document.fullscreenElement) { document.exitFullscreen(); return; }
+      var el = document.documentElement;
+      var p = el.requestFullscreen ? el.requestFullscreen() : null;
+      if (p && p.catch) p.catch(function () { setMsg('<span class="warn">Full screen is not available here.</span> Your browser or this view blocked it.'); });
+      else if (!p) setMsg('<span class="warn">Full screen is not available here.</span> Your browser or this view blocked it.');
+    } catch (e) { /* ignore */ }
+  }
+  window.addEventListener('resize', fit);
+  window.addEventListener('orientationchange', function () { setTimeout(fit, 120); });
+  document.body.classList.toggle('touch', touch);
+  if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) document.body.classList.add('nofs');
+  document.addEventListener('fullscreenchange', function () { setTimeout(fit, 50); });
+  fit();
+
+  loadTheme();
+  loadSave();
+  load(state.level);
+})();
+</script>
+
+
+</body></html>
